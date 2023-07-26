@@ -1,0 +1,17 @@
+<div class="name-dialog">
+    <h1 mat-dialog-title>Modal Title</h1>
+    <div mat-dialog-content>
+        <mat-form-field>
+            <mat-label>First Name</mat-label>
+            <input matInput [(ngModel)]="data.firstName">
+        </mat-form-field>
+        <mat-form-field>
+            <mat-label>Last Name</mat-label>
+            <input matInput [(ngModel)]="data.lastName">
+        </mat-form-field>
+    </div>
+    <div mat-dialog-actions align="center">
+        <button mat-button mat-dialog-close>Cancel</button>
+        <button mat-button [mat-dialog-close]="{name: data.firstName, lastName: data.lastName}">Save</button>
+    </div>
+</div>
