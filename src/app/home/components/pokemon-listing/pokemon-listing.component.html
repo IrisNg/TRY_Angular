@@ -1,0 +1,11 @@
+<shared-listing
+  [filterComponentsConfig]="FILTER_COMPONENTS_CONFIG"
+  [listingConfig]="LISTING_CONFIG"
+  [paginationConfig]="PAGINATION_CONFIG"
+  [listingItem]="listingItem"
+></shared-listing>
+<ng-template #listingItem let-state>
+  <div class="pokemon-listing__item">
+    <p>Pokemon Name: {{ state.name }}</p>
+  </div>
+</ng-template>

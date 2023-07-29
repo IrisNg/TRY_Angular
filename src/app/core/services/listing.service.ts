@@ -1,73 +1,91 @@
-import { Inject, Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, map, mergeMap, of } from 'rxjs';
+import { Inject, Injectable, OnDestroy, Optional } from '@angular/core';
+import { BehaviorSubject, Observable, Subscription, map } from 'rxjs';
 
-export interface IListingApi<TRequestParams, TResponse> {
+export interface ListingApi<TRequestParams, TResponse> {
   onGetAll(requestParams: TRequestParams): Observable<TResponse>;
 }
 
-// interface IFilters {
-//     [key:string]: string | number | boolean
-// }
-
-export interface IFilters {
-  [key: string]: string | number | boolean;
-}
-export type Filters = IFilters | null;
-
 export const LISTING_API_SERVICE = 'LISTING_API_SERVICE';
-export const LISTING_INITIAL_FILTERS = 'LISTING_INITIAL_FILTERS';
+export const LISTING_INITIAL_REQUEST_PAYLOAD = 'LISTING_INTIAL_REQUEST_PAYLOAD';
+export const LISTING_REQUEST_TRANSFORMER = 'LISTING_REQUEST_TRANSFORMER';
+export const LISTING_RESPONSE_TRANSFORMER = 'LISTING_RESPONSE_TRANSFORMER';
 
+@Injectable()
 export class ListingService<
-  TFilters extends Filters,
+  TRequestPayload,
   TRequestParams,
-  TResponse
-> {
-  fetchedListing = new BehaviorSubject<TResponse | null>(null);
-  listing$ = this.fetchedListing.asObservable();
+  TResponse,
+  TResultingResponse
+> implements OnDestroy
+{
+  private fetchedListing = new BehaviorSubject<TResultingResponse | null>(null);
+  public listing$ = this.fetchedListing.asObservable();
 
-  // private listingApiService!: IListingApi<TFilters, TRequestParams, TResponse>;
+  private requestPayloadSubscription?: Subscription;
 
-  // Optional formatter callback
-  private requestFormatter: ((filters: TFilters) => TRequestParams) | null =
-    null;
-  private responseFormatter: ((response: TResponse) => any) | null = null;
-
-  // private filters!: TFilters;
-
+  // To make listingApiService swappable, see angular docs useFactory
+  // Inject transformers here to use it during service initialization and initial listing fetch
   constructor(
     @Inject(LISTING_API_SERVICE)
-    private listingApiService: IListingApi<TRequestParams, TResponse>,
-    @Inject(LISTING_INITIAL_FILTERS) private filters: TFilters
-  ) {}
-
-  // TODO: maybe add this to make listingApiService swappable?
-  // setListingApiService(listingApiService: IListingApi<TFilters, TResponse>) {
-  //     this.listingApiService = listingApiService;
-  // }
-
-  setRequestFormatter(
-    requestFormatter: (filters: TFilters) => TRequestParams
-  ): void {
-    this.requestFormatter = requestFormatter;
+    private listingApiService: ListingApi<TRequestParams, TResponse>,
+    @Inject(LISTING_INITIAL_REQUEST_PAYLOAD)
+    private initialRequestPayload: TRequestPayload,
+    @Optional()
+    @Inject(LISTING_REQUEST_TRANSFORMER)
+    private requestTransformer?: (
+      requestPayload: TRequestPayload
+    ) => TRequestParams,
+    @Optional()
+    @Inject(LISTING_RESPONSE_TRANSFORMER)
+    private responseTransformer?: (response: TResponse) => TResultingResponse
+  ) {
+    this.onFetchListing(this.initialRequestPayload);
   }
 
-  onFilterChange(): void {}
+  ngOnDestroy(): void {
+    console.log('listing service destroyed');
+    if (this.requestPayloadSubscription) {
+      this.requestPayloadSubscription.unsubscribe();
+    }
+  }
 
-  onFetchListing() {
-    const requestParams = (
-      this.requestFormatter ? this.requestFormatter(this.filters) : this.filters
-    ) as TRequestParams;
+  setRequestPayloadSubscription(requestPayload$: Observable<TRequestPayload>) {
+    // TODO: add universal debounce operator here? or leave it to implementation class?
+    this.requestPayloadSubscription = requestPayload$.subscribe(
+      (requestPayload) => {
+        // When there is new requestPayload, trigger refetch listing
+        this.onFetchListing(requestPayload);
+      }
+    );
+  }
+
+  // Change transformer after service initialization
+  setRequestTransformer(
+    requestTransformer: (requestPayload: TRequestPayload) => TRequestParams
+  ): void {
+    this.requestTransformer = requestTransformer;
+  }
+
+  setResponseTransformer(
+    responseTransformer: (response: TResponse) => TResultingResponse
+  ): void {
+    this.responseTransformer = responseTransformer;
+  }
+
+  onFetchListing(requestPayload: TRequestPayload) {
+    const requestParams = (this.requestTransformer?.(requestPayload) ??
+      requestPayload) as TRequestParams;
 
     // TODO: handle errors
     this.listingApiService
       .onGetAll(requestParams)
       .pipe(
-        map((value) => {
-          return this.responseFormatter !== null
-            ? this.responseFormatter(value)
-            : value;
+        map((response) => {
+          return this.responseTransformer?.(response) ?? response;
         })
       )
-      .subscribe((response) => this.fetchedListing.next(response));
+      .subscribe((resultingResponse) =>
+        this.fetchedListing.next(resultingResponse as TResultingResponse)
+      );
   }
 }

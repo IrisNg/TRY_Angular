@@ -1,0 +1,66 @@
+<div class="shared-listing">
+  <section
+    *ngIf="filterComponentsConfig && filterComponentsConfig.length"
+    class="shared-listing__filter-section"
+  >
+    <form #form="ngForm">
+      <div class="shared-listing__filter-container">
+        <div
+          class="form-group"
+          *ngFor="let filter of filterComponentsConfig"
+          [ngSwitch]="filter.type"
+        >
+          <div
+            *ngSwitchCase="filterComponentTypeEnum.SEARCH_BAR"
+            class="search"
+          >
+            <input
+              type="text"
+              [name]="filter.name"
+              [ngModel]="filter.initialValue ?? ''"
+            />
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="shared-listing__listing-section">
+    <ng-container
+      *ngIf="listing$ | async as listing"
+      [ngSwitch]="listingConfig.containerType"
+    >
+      <div
+        *ngIf="listing && listing.items"
+        class="shared-listing__listing-container"
+      >
+        <div
+          *ngSwitchCase="listingContainerTypeEnum.TILE"
+          class="shared-listing__listing--tile"
+        >
+          <div class="shared-listing__item" *ngFor="let item of listing.items">
+            <ng-container
+              [ngTemplateOutlet]="listingItem || defaultListingItem"
+              [ngTemplateOutletContext]="{ $implicit: item }"
+            ></ng-container>
+          </div>
+        </div>
+        <div
+          *ngSwitchCase="listingContainerTypeEnum.TABLE"
+          class="shared-listing__listing--table"
+        >
+          <div class="shared-listing__item" *ngFor="let item of listing.items">
+            <ng-container
+              [ngTemplateOutlet]="listingItem || defaultListingItem"
+              [ngTemplateOutletContext]="{ $implicit: item }"
+            ></ng-container>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </section>
+  <shared-pagination *ngIf="paginationConfig"></shared-pagination>
+</div>
+<ng-template #defaultListingItem>
+  <p>No ListingItem template provided.</p>
+</ng-template>
