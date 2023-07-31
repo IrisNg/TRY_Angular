@@ -1,0 +1,97 @@
+<div class="paginator" *ngIf="pagesArray.length > 0">
+  <ul class="paginator__buttons">
+    <ng-container *ngFor="let component of pagesArray" [ngSwitch]="true">
+      <li
+        *ngSwitchCase="component === pageNumber"
+        class="paginator__page current"
+      >
+        {{ component }}
+      </li>
+      <li
+        *ngSwitchCase="isPageNumber(component) && component !== pageNumber"
+        class="paginator__page"
+      >
+        <button type="button" (click)="onPageChange(castToNumber(component))">
+          {{ component }}
+        </button>
+      </li>
+      <li
+        *ngSwitchCase="
+          component === PagesArrayComponentEnum.DOTS_TO_LAST ||
+          component === PagesArrayComponentEnum.DOTS_TO_FIRST
+        "
+        class="paginator__dots"
+      >
+        ...
+      </li>
+      <li
+        *ngSwitchCase="component === PagesArrayComponentEnum.NEXT_ARROW"
+        class="paginator__next-arrow"
+      >
+        <button type="button" (click)="onPageChange(pageNumber + 1)">
+          <mat-icon aria-hidden="false" aria-label="Next page icon">{{
+            config.iconNextArrow
+          }}</mat-icon>
+        </button>
+      </li>
+      <li
+        *ngSwitchCase="
+          component === PagesArrayComponentEnum.NEXT_ARROW_DISABLED
+        "
+        class="paginator__next-arrow is-disabled"
+      >
+        <button type="button" disabled>
+          <mat-icon aria-hidden="false" aria-label="Next page icon disabled">{{
+            config.iconNextArrow
+          }}</mat-icon>
+        </button>
+      </li>
+      <li
+        *ngSwitchCase="component === PagesArrayComponentEnum.PREV_ARROW"
+        class="paginator__prev-arrow"
+      >
+        <button type="button" (click)="onPageChange(pageNumber - 1)">
+          <mat-icon aria-hidden="false" aria-label="Previous page icon">{{
+            config.iconPrevArrow
+          }}</mat-icon>
+        </button>
+      </li>
+      <li
+        *ngSwitchCase="
+          component === PagesArrayComponentEnum.PREV_ARROW_DISABLED
+        "
+        class="paginator__prev-arrow is-disabled"
+      >
+        <button type="button" disabled>
+          <mat-icon
+            aria-hidden="false"
+            aria-label="Previous page icon disabled"
+            >{{ config.iconPrevArrow }}</mat-icon
+          >
+        </button>
+      </li>
+
+      <li
+        *ngSwitchCase="component === PagesArrayComponentEnum.FIRST_ARROW"
+        class="paginator__first-arrow"
+      >
+        <button type="button" (click)="onPageChange(1)">
+          <mat-icon aria-hidden="false" aria-label="First page icon">{{
+            config.iconFirstArrow
+          }}</mat-icon>
+        </button>
+      </li>
+
+      <li
+        *ngSwitchCase="component === PagesArrayComponentEnum.LAST_ARROW"
+        class="paginator__last-arrow"
+      >
+        <button type="button" (click)="onPageChange(lastPageNumber)">
+          <mat-icon aria-hidden="false" aria-label="Last page icon">{{
+            config.iconLastArrow
+          }}</mat-icon>
+        </button>
+      </li>
+    </ng-container>
+  </ul>
+</div>
