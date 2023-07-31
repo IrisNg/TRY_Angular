@@ -1,11 +1,10 @@
 import { Component, OnInit } from '@angular/core';
+import { ErrorService } from 'src/app/core/services/error.service';
 import {
   LISTING_API_SERVICE,
-  LISTING_INITIAL_REQUEST_PAYLOAD,
-  LISTING_REQUEST_TRANSFORMER,
-  LISTING_RESPONSE_TRANSFORMER,
   ListingService,
 } from 'src/app/core/services/listing.service';
+import { LoadingService } from 'src/app/core/services/loading.service';
 import {
   PokemonApiService,
   GetAllRequestParams,
@@ -19,14 +18,18 @@ import {
   FilterComponentTypeEnum,
   ListingContainerTypeEnum,
 } from 'src/app/shared/components/listing/listing.component';
-import { PaginationConfig } from 'src/app/shared/components/pagination/pagination.component';
+import { PaginatorConfig } from 'src/app/shared/components/paginator/paginator.component';
 
 interface PokemonListingFilters extends Filters {
   search: string;
+  pageNumber: number;
+  pageSize: number;
 }
 
 const INITIAL_FILTERS: PokemonListingFilters = {
-  search: 'query',
+  search: '',
+  pageNumber: 1,
+  pageSize: 5,
 };
 
 @Component({
@@ -42,7 +45,8 @@ const INITIAL_FILTERS: PokemonListingFilters = {
       GetAllResponse
     >,
     { provide: LISTING_API_SERVICE, useClass: PokemonApiService },
-    { provide: LISTING_INITIAL_REQUEST_PAYLOAD, useValue: INITIAL_FILTERS },
+    ErrorService,
+    LoadingService,
   ],
 })
 export class PokemonListingComponent implements OnInit {
@@ -50,16 +54,18 @@ export class PokemonListingComponent implements OnInit {
     {
       type: FilterComponentTypeEnum.SEARCH_BAR,
       name: 'search',
-      initialValue: INITIAL_FILTERS.search,
     },
   ];
+
   public readonly LISTING_CONFIG: ListingConfig = {
     containerType: ListingContainerTypeEnum.TABLE,
   };
 
-  public readonly PAGINATION_CONFIG: PaginationConfig = {
-    pageSize: 20,
+  public readonly PAGINATOR_CONFIG: PaginatorConfig = {
+    pageSize: INITIAL_FILTERS.pageSize,
   };
+
+  public readonly INITIAL_FILTERS = INITIAL_FILTERS;
 
   constructor() {}
 

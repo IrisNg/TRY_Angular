@@ -10,10 +10,13 @@ export interface GetAllRequestParams extends RequestParams {
   search: string;
   startCreatedDate: string;
   endCreatedDate: string;
+  pageNumber: number;
+  pageSize: number;
 }
 
 export interface GetAllResponse extends ListingResponse {
-  count: number;
+  pageNumber: number;
+  totalItemsCount: number;
   items: { Id: number; Name: string }[];
 }
 
