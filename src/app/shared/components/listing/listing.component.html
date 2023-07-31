@@ -1,44 +1,42 @@
-<div class="shared-listing">
-  <section
-    *ngIf="filterComponentsConfig && filterComponentsConfig.length"
-    class="shared-listing__filter-section"
-  >
-    <form #form="ngForm">
-      <div class="shared-listing__filter-container">
+<div class="listing">
+  <section *ngIf="filtersForm" class="listing__filter-section">
+    <form [formGroup]="filtersForm">
+      <div class="listing__filter-container">
         <div
           class="form-group"
           *ngFor="let filter of filterComponentsConfig"
           [ngSwitch]="filter.type"
         >
           <div
-            *ngSwitchCase="filterComponentTypeEnum.SEARCH_BAR"
-            class="search"
+            *ngSwitchCase="FilterComponentTypeEnum.SEARCH_BAR"
+            class="listing__filter--search"
           >
-            <input
-              type="text"
-              [name]="filter.name"
-              [ngModel]="filter.initialValue ?? ''"
-            />
+            <input type="text" [formControlName]="filter.name" />
           </div>
         </div>
       </div>
     </form>
   </section>
 
-  <section class="shared-listing__listing-section">
+  <section
+    showLoader
+    [isLoading]="loadingService.isLoading$ | async"
+    class="listing__listing-section"
+  >
+    <ng-container #loaderPlaceholder></ng-container>
+    <ng-container *ngIf="errorService.errorMessage$ | async as errorMessage">
+      <div class="listing__listing-error">{{ errorMessage }}</div>
+    </ng-container>
     <ng-container
       *ngIf="listing$ | async as listing"
       [ngSwitch]="listingConfig.containerType"
     >
-      <div
-        *ngIf="listing && listing.items"
-        class="shared-listing__listing-container"
-      >
+      <div *ngIf="listing && listing.items" class="listing__listing-container">
         <div
-          *ngSwitchCase="listingContainerTypeEnum.TILE"
-          class="shared-listing__listing--tile"
+          *ngSwitchCase="ListingContainerTypeEnum.TILE"
+          class="listing__listing--tile"
         >
-          <div class="shared-listing__item" *ngFor="let item of listing.items">
+          <div class="listing__item" *ngFor="let item of listing.items">
             <ng-container
               [ngTemplateOutlet]="listingItem || defaultListingItem"
               [ngTemplateOutletContext]="{ $implicit: item }"
@@ -46,10 +44,10 @@
           </div>
         </div>
         <div
-          *ngSwitchCase="listingContainerTypeEnum.TABLE"
-          class="shared-listing__listing--table"
+          *ngSwitchCase="ListingContainerTypeEnum.TABLE"
+          class="listing__listing--table"
         >
-          <div class="shared-listing__item" *ngFor="let item of listing.items">
+          <div class="listing__item" *ngFor="let item of listing.items">
             <ng-container
               [ngTemplateOutlet]="listingItem || defaultListingItem"
               [ngTemplateOutletContext]="{ $implicit: item }"
@@ -59,7 +57,15 @@
       </div>
     </ng-container>
   </section>
-  <shared-pagination *ngIf="paginationConfig"></shared-pagination>
+  <ng-container *ngIf="listing$ | async as listing">
+    <shared-paginator
+      *ngIf="listing.pageNumber && listing.totalItemsCount"
+      [paginatorConfig]="paginatorConfig"
+      [pageNumber]="listing.pageNumber"
+      [totalItemsCount]="listing.totalItemsCount"
+      (pageChanged)="onPageChange($event)"
+    ></shared-paginator>
+  </ng-container>
 </div>
 <ng-template #defaultListingItem>
   <p>No ListingItem template provided.</p>

@@ -1,22 +1,33 @@
 import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit, TemplateRef } from '@angular/core';
 import {
-  Component,
-  Input,
-  OnInit,
-  TemplateRef,
-  ViewChild,
-} from '@angular/core';
-import { FormsModule, NgForm } from '@angular/forms';
-import { Observable, Subscription, debounceTime } from 'rxjs';
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+} from '@angular/forms';
+import {
+  Observable,
+  ReplaySubject,
+  combineLatest,
+  debounceTime,
+  map,
+  startWith,
+  tap,
+} from 'rxjs';
 import { ListingService } from 'src/app/core/services/listing.service';
 import {
-  PaginationComponent,
-  PaginationConfig,
-} from '../pagination/pagination.component';
+  PageChangedEventData,
+  PaginatorComponent,
+  PaginatorConfig,
+} from '../paginator/paginator.component';
+import { ErrorService } from 'src/app/core/services/error.service';
+import { LoadingService } from 'src/app/core/services/loading.service';
+import { ShowLoaderDirective } from '../../directives/show-loader/show-loader.directive';
 
-export interface Filters {
+export type Filters = {
   [key: string]: string | number | boolean;
-}
+} & Partial<PageChangedEventData>;
 
 export type NullableFilters = Filters | null;
 
@@ -24,7 +35,8 @@ type ListingItem = any;
 
 export interface ListingResponse {
   items: ListingItem[];
-  count?: number;
+  totalItemsCount?: number;
+  pageNumber?: number;
 }
 
 export enum FilterComponentTypeEnum {
@@ -41,7 +53,6 @@ export enum ListingContainerTypeEnum {
 interface FilterComponent {
   type: FilterComponentTypeEnum;
   name: string;
-  initialValue?: string | number | boolean;
 }
 
 export type FilterComponentsConfig = FilterComponent[];
@@ -54,7 +65,13 @@ export interface ListingConfig {
   standalone: true,
   selector: 'shared-listing',
   templateUrl: 'listing.component.html',
-  imports: [CommonModule, FormsModule, PaginationComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    ShowLoaderDirective,
+    PaginatorComponent,
+  ],
 })
 export class ListingComponent<
   TFilters extends NullableFilters,
@@ -67,13 +84,18 @@ export class ListingComponent<
   @Input() listingConfig: ListingConfig = {
     containerType: ListingContainerTypeEnum.TILE,
   };
-  @Input() paginationConfig?: PaginationConfig;
+  @Input() paginatorConfig?: PaginatorConfig;
+  @Input() initialFilters?: TFilters;
 
-  public filterComponentTypeEnum = FilterComponentTypeEnum;
-  public listingContainerTypeEnum = ListingContainerTypeEnum;
+  public FilterComponentTypeEnum = FilterComponentTypeEnum;
+  public ListingContainerTypeEnum = ListingContainerTypeEnum;
 
   @Input() listingItem?: TemplateRef<{ $implicit: ListingItem }>;
-  @ViewChild('form', { static: true }) filtersForm?: NgForm;
+
+  private pageChanged = new ReplaySubject<Partial<TFilters> | null>(1);
+  filtersForm?: FormGroup;
+  public filters$?: Observable<TFilters>;
+
   public listing$?: Observable<TResultingResponse | null>;
 
   constructor(
@@ -82,18 +104,71 @@ export class ListingComponent<
       TRequestParams,
       TResponse,
       TResultingResponse
-    >
+    >,
+    public errorService: ErrorService,
+    public loadingService: LoadingService
   ) {}
 
   ngOnInit() {
+    // Setup reactive filters form
+    if (this.filterComponentsConfig && this.filterComponentsConfig.length > 0) {
+      const formControls = this.filterComponentsConfig.reduce<{
+        [key: string]: FormControl;
+      }>((acc, cur) => {
+        const { name } = cur;
+
+        acc[name] = new FormControl(this.initialFilters?.[name] ?? null);
+
+        return acc;
+      }, {});
+
+      this.filtersForm = new FormGroup(formControls);
+    }
+
+    // Get listing service observable
     this.listing$ = this.listingService.listing$;
 
-    if (this.filtersForm) {
-      // Possible to configure to refresh listing on form manual submit
-      const filters$ = (
-        this.filtersForm.form.valueChanges as Observable<TFilters>
-      ).pipe(debounceTime(2000));
-      this.listingService.setRequestPayloadSubscription(filters$);
+    // Make listing service subscribe to any filter changes
+    let filtersFormChange$ = this.filtersForm?.valueChanges.pipe(
+      startWith(this.initialFilters ?? {}),
+      debounceTime(1000)
+    );
+    let pageChange$ = this.paginatorConfig
+      ? this.pageChanged.asObservable().pipe(
+          startWith(
+            this.initialFilters
+              ? {
+                  pageNumber: this.initialFilters.pageNumber ?? 1,
+                  pageSize: this.initialFilters.pageSize ?? 20,
+                }
+              : {}
+          )
+        )
+      : null;
+
+    if (filtersFormChange$ && pageChange$) {
+      this.filters$ = combineLatest([filtersFormChange$, pageChange$]).pipe(
+        map(([filtersFormData, pageChangeData]) => {
+          return {
+            ...filtersFormData,
+            ...pageChangeData,
+          };
+        }),
+        tap((x) => console.log('valueee', x))
+      );
+    } else if (filtersFormChange$) {
+      this.filters$ = filtersFormChange$ as Observable<TFilters>;
+    } else if (pageChange$) {
+      this.filters$ = pageChange$ as Observable<TFilters>;
     }
+
+    // Also ossible to configure to refresh listing on form manual submit instead of form changes
+    if (this.filters$) {
+      this.listingService.setRequestPayloadSubscription(this.filters$);
+    }
+  }
+
+  onPageChange($event: PageChangedEventData) {
+    this.pageChanged.next($event as unknown as Partial<TFilters>);
   }
 }
