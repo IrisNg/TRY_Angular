@@ -8,7 +8,7 @@ import {
   tap,
 } from 'rxjs';
 import { LoadingService } from './loading.service';
-import { ErrorService } from './error.service';
+import { ErrorService, ErrorMessageTransformer } from './error.service';
 
 export interface ListingApi<TRequestParams, TResponse> {
   onGetAll(requestParams: TRequestParams): Observable<TResponse>;
@@ -19,6 +19,8 @@ export const LISTING_ENABLE_INITIAL_FETCH = 'LISTING_ENABLE_INITIAL_FETCH';
 export const LISTING_INITIAL_REQUEST_PAYLOAD = 'LISTING_INTIAL_REQUEST_PAYLOAD';
 export const LISTING_REQUEST_TRANSFORMER = 'LISTING_REQUEST_TRANSFORMER';
 export const LISTING_RESPONSE_TRANSFORMER = 'LISTING_RESPONSE_TRANSFORMER';
+export const LISTING_ERROR_MESSAGE_TRANSFORMER =
+  'LISTING_ERROR_MESSAGE_TRANSFORMER';
 
 @Injectable()
 export class ListingService<
@@ -53,14 +55,23 @@ export class ListingService<
     ) => TRequestParams,
     @Optional()
     @Inject(LISTING_RESPONSE_TRANSFORMER)
-    private responseTransformer?: (response: TResponse) => TResultingResponse
+    private responseTransformer?: (
+      response?: TResponse | null
+    ) => TResultingResponse,
+    @Optional()
+    @Inject(LISTING_ERROR_MESSAGE_TRANSFORMER)
+    private errorMessageTransformer?: ErrorMessageTransformer
   ) {
     if (this.enableInitialFetch) {
       // Initial fetch listing on service initialization
       this.loadingService
         .showLoadingUntilCompleted(
           this.errorService.showErrorIfCaught(
-            this.onFetchListing(this.initialRequestPayload)
+            this.onFetchListing(this.initialRequestPayload),
+            {
+              fallbackValue: null,
+              errorMessageTransformer: this.errorMessageTransformer,
+            }
           )
         )
         .subscribe(this.onFetchListingSuccess.bind(this));
@@ -92,13 +103,16 @@ export class ListingService<
       switchMap((requestPayload: TRequestPayload) => {
         return this.loadingService.showLoadingUntilCompleted(
           this.errorService.showErrorIfCaught(
-            this.onFetchListing(requestPayload)
+            this.onFetchListing(requestPayload),
+            {
+              // Prevents http response error from stopping requestPayload$ observable
+              fallbackValue: null,
+              errorMessageTransformer: this.errorMessageTransformer,
+            }
           )
         );
       })
     );
-
-    //TODO: don't crash listing if error is caught
 
     this.requestPayloadSubscription = obs$.subscribe(
       this.onFetchListingSuccess.bind(this)
@@ -113,7 +127,7 @@ export class ListingService<
   }
 
   setResponseTransformer(
-    responseTransformer: (response: TResponse) => TResultingResponse
+    responseTransformer: (response?: TResponse | null) => TResultingResponse
   ): void {
     this.responseTransformer = responseTransformer;
   }
@@ -128,7 +142,7 @@ export class ListingService<
     return this.listingApiService.onGetAll(requestParams).pipe(shareReplay());
   }
 
-  onFetchListingSuccess(response: TResponse): void {
+  onFetchListingSuccess(response?: TResponse | null): void {
     const resultingResponse = (this.responseTransformer?.(response) ??
       response) as TResultingResponse;
 

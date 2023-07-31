@@ -9,6 +9,8 @@ import {
   throwError,
 } from 'rxjs';
 
+export type ErrorMessageTransformer = (error: Error) => string;
+
 @Injectable()
 export class ErrorService {
   private errorSubject = new BehaviorSubject<string>('');
@@ -16,13 +18,30 @@ export class ErrorService {
 
   constructor() {}
 
-  showErrorIfCaught<T>(obs$: Observable<T>): Observable<T> {
+  showErrorIfCaught<T, F>(
+    obs$: Observable<T>,
+    options?: {
+      errorMessageTransformer?: ErrorMessageTransformer;
+      fallbackValue?: F;
+    }
+  ): Observable<T | F | undefined> {
+    const { errorMessageTransformer, fallbackValue } = options ?? {};
+
     return of(null).pipe(
       tap(() => this.clearError()),
       switchMap(() => obs$),
       catchError((error: Error) => {
-        console.log('Error service caught error', error)
-        this.addError(error);
+        console.log('Error service caught error', error);
+
+        this.addError(errorMessageTransformer?.(error) ?? error.message);
+
+        if (options && 'fallbackValue' in options) {
+          // Emit fallbackValue to subscribe() next function
+          // Especially important in preventing inner http observable from short-circuiting outer observable
+          // outer observable = eg form values change observable, that should never complete or error-out
+          return of(fallbackValue);
+        }
+        // Forward same error to subscribe() error function
         return throwError(() => error);
       })
     );
@@ -31,7 +50,8 @@ export class ErrorService {
   clearError() {
     this.errorSubject.next('');
   }
-  addError(error: Error) {
-    this.errorSubject.next(error?.message ?? 'Something went wrong.');
+
+  addError(errorMessage?: string) {
+    this.errorSubject.next(errorMessage ?? 'Something went wrong.');
   }
 }
