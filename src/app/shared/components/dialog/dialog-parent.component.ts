@@ -4,7 +4,7 @@ import {
   MAT_DIALOG_DATA,
   MatDialogRef,
   MatDialogModule,
-} from '@angular/material/dialog';
+} from '../dso/dialog';
 import { NameDialogComponent, NameDialogData } from './name-dialog.component';
 
 @Component({
